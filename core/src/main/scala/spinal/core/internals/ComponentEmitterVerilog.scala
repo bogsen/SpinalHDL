@@ -1029,36 +1029,15 @@ end
         b ++= s"${tab}end\n"
     }
 
-    val cdTasks = mutable.LinkedHashMap[ClockDomain, ArrayBuffer[MemPortStatement]]()
-    mem.foreachStatements{
-      case port: MemWrite     =>
-        cdTasks.getOrElseUpdate(port.clockDomain, ArrayBuffer[MemPortStatement]()) += port
-      case port: MemReadSync  =>
-        cdTasks.getOrElseUpdate(port.clockDomain, ArrayBuffer[MemPortStatement]()) += port
-      case port: MemReadWrite =>
-        cdTasks.getOrElseUpdate(port.clockDomain, ArrayBuffer[MemPortStatement]()) += port
-      case port: MemReadAsync =>
-    }
-
     val tmpBuilder = new StringBuilder()
-
-    for((cd, ports) <- cdTasks){
-      def syncLogic(tab: String, b: StringBuilder): Unit ={
-        ports.foreach{
-          case port: MemWrite     => emitPort(port, tab, b)
-          case port: MemReadSync  => if(port.readUnderWrite != dontCare) emitPort(port, tab, b)
-          case port: MemReadWrite => emitPort(port, tab, b)
-        }
-      }
-      emitClockedProcess(syncLogic, null, tmpBuilder, cd, false)
-    }
 
     mem.foreachStatements{
       case port: MemWrite      =>
+        emitClockedProcess(emitPort(port, _, _), null, tmpBuilder, port.clockDomain, false)
       case port: MemReadWrite  =>
+        emitClockedProcess(emitPort(port, _, _), null, tmpBuilder, port.clockDomain, false)
       case port: MemReadSync   =>
-        if(port.readUnderWrite == dontCare)
-          emitClockedProcess(emitPort(port, _, _), null, tmpBuilder, port.clockDomain, false)
+        emitClockedProcess(emitPort(port, _, _), null, tmpBuilder, port.clockDomain, false)
       case port: MemReadAsync  =>
         if(port.aspectRatio != 1) SpinalError(s"VERILOG backend can't emit ${port.mem} because of its mixed width ports")
 
